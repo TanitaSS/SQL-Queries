@@ -1,0 +1,344 @@
+SELECT *, COUNT(*)
+FROM client
+WHERE nom NOT LIKE 'VILLALONGA%' AND nom NOT LIKe '%VILLALONGA%'
+
+SELECT *
+FROM article
+WHERE descrip LIKE 'Pulsador%' ANd preu BETWEEN 2 AND 4 AND stock > stock_min
+ORDER BY preu DESC
+
+SELECT *
+FROM linia_fac
+WHERE cod_a LIKE 'L76104'
+
+SELECT cod_a, COUNT(*), SUM(quant)
+FROM linia_fac
+WHERE cod_a LIKE 'L76104'
+
+SELECT cod_a, descrip, COALESCE(stock,0)
+FROM article 
+
+
+-- сменить NULL на цифру  
+SELECT COALESCE(stock,0)
+FROM article 
+
+SELECT cod_pro, COUNT(*)
+FROM poble
+GROUP BY cod_pro;
+
+--
+SELECT cod_pob,cp, COUNT(*)
+FROM client
+GROUP BY cod_pob,cp
+
+--считаем количество заказов по каждосу клиенту 
+SELECT cod_ven, cod_cli,COUNT(*)
+FROM factura
+GROUP BY cod_ven, cod_cli
+
+
+-- сколько раз был продан товар и на какую сумму в общем  
+SELECT cod_a AS 'Articulo', COUNT(*) AS 'Total' , SUM(quant) AS 'SUMA', MAX(quant), MIN(quant)
+FROM linia_fac
+GROUP BY cod_a; 
+
+
+SELECT COALESCE(cod_cat, ''), COUNT(*), AVG(preu),
+FROM article
+GROUP BY cod_cat
+
+
+--города от 3 до 7 клиентов 
+SELECT cod_pob AS 'City code' , COUNT(*) AS 'Client number'
+FROM client
+GROUP BY cod_pob
+HAVING COUNT(*) BETWEEN 3 AND 7
+
+
+-- клиент у кого больше 1 инвоса и общее количествоarticle
+SELECT cod_cli, COUNT(*)
+FROM factura
+GROUP BY cod_cli;
+HAVING COUNT >1
+
+
+
+SELECT Quarter(data) AS 'Trimestre', COUNT(*) AS 'Factura'
+FROM factura
+GROUP BY Quarter(data)
+
+SELECT num_f AS 'NF', SUM(quant*preu) AS 'AMOUNT'
+FROM linia_fac
+GROUP BY num_f
+ORDER BY 2 DESC;
+ORDER by cod_cat, stock,preu;
+
+-- сортировать по сток макс и сток мин и разница между ними 
+SELECT cod_a, descrip,preu,stock, stock_min, COALESCE(stock, '0')-stock_min AS 'Difference'
+FROM article
+ORDER BY 6 DESC
+
+-- количество инвойсов продавца во втором семестре 2015 года 
+
+SELECT cod_ven, COUNT(*)
+FROM factura
+WHERE year(data)=2015 AND QUARTER(DATA) BETWEEN 3 AND 4
+GROUP BY cod_ven
+ORDER BY 2 DESC;
+
+
+SELECT cod_ven, data
+FROM factura
+WHERE year(data)=2015 AND month(DATA)=1
+GROUP BY cod_ven;
+
+
+
+SELECT *
+FROM article
+ORDER BY preu DESC
+LIMIT 2;
+
+-- join разние колонки 
+SELECT f.num_f, sum(lf.quant*lf.preu)
+FROM factura AS f, linia_fac as lf
+WHERE f.num_f=lf.num_f
+group by f.num_f
+order by 2 DESC
+limit 3;
+
+
+-- создать тейбл 
+CREATE table ARTICLE_99 AS SELECT cod_a,descrip,preu,COALESCE(stock,'0') as 'STOCK',COALESCE(stock_min) AS 'STOCK MIN', COALESCE(cod_cat,'') as 'COD CAT'
+from article;
+
+SELECT MAX(STOCK), MIN(STOCK), avg(STOCK)
+from ARTICLE_99;
+
+-- соеденить несколько тейблс-- как сработал дистинкт для код_а???
+SELECT DISTINCT c.nom, a.cod_a, a.descrip
+From client c, factura f, linia_fac l_f, article a
+where c.cod_cli = f.cod_cli AND f.num_f=l_f.num_f AND l_f.cod_a=a.cod_a
+order by 1,2 
+limit 100;
+
+SELECT f.num_f,SUM(l_f.quant*l_f.preu)*(coalesce(l_f.dte,'0')*100)) AS 'TOTAL AMOUNT WITH DISCOUNT'
+from factura f,linia_fac l_f
+WHERE f.num_f=l_f.num_f
+group by 1
+ORDER BY 1; 
+
+-- цена со скидкой 
+SELECT f.num_f,
+       SUM(l_f.quant * l_f.preu) * (1 - COALESCE(l_f.dte, 0) / 100) AS 'TOTAL AMOUNT WITH DISCOUNT'
+FROM factura f
+JOIN linia_fac l_f ON f.num_f = l_f.num_f
+GROUP BY f.num_f
+ORDER BY f.num_f;
+
+
+create VIEW Tania as 
+select cod_a, descrip, preu
+from article
+
+SELECT *
+from Tania
+
+
+SELECT l_f.cod_a, a.descrip, count(*) as 'VECEC VENDIDO', sum(l_f.quant) AS 'Total', AVG(l_f.preu) 'Media'
+from linia_fac l_f INNER join article a ON l_f.cod_a=a.cod_a
+GROUP by l_f.cod_a
+ORDER by 3 DESC, 2 ASC;
+
+--код категории сколько раз продукт этой категирии был продан 
+
+select c.cod_cat, c.descripcio, sum(l_f.quant)
+from linia_fac l_f, article a, categoria c
+where l_f.cod_a=a.cod_a and a.cod_cat=c.cod_cat 
+group by c.cod_cat
+having sum(l_f.quant)>100
+order by 3 DESC;
+
+
+
+-- клиенты которые ичего не покупалиarticle
+SELECT cod_cli, nom
+from client 
+where cod_cli NOT IN (SELECT cod_cli
+                     FROM factura)
+
+SELECT a.cod_a, a.descrip, SUM(l_f.quant), AS total_quantity_sold
+FROM article a
+LEFT JOIN linia_fac l_f ON l_f.cod_a = a.cod_a
+WHERE l_f.cod_a IS NULL  -- Filter to get articles that have never been sold
+GROUP BY a.cod_a, a.descrip
+ORDER BY a.cod_a;
+
+-- find clients who has no invoice 
+
+SELECT cod_cli, nom
+from client
+where cod_cli NOT IN (
+  SELECT cod_cli
+  from factura);
+  
+  SELECT a.cod_a, a.descrip, COALESCE(sum(l_f.quant),0)
+  from article a left join linia_fac l_f ON a.cod_a=l_f.cod_a
+  GROUP by a.cod_a;
+  
+
+select a.cod_a, c.cod_cat
+from categoria c inner join article a on a.cod_cat= c.cod_cat
+group by c.cod_cat;
+
+
+-- max facturas for unique client 
+select cod_cli, count(*)
+from facturaura
+group by cod_cliorder by 2 DESC
+limit 1;
+
+-- more and less expensive invoice 
+
+
+select max(table1.maximum),min(table1.minimum) from 
+
+(SELECT f.num_f,sum(l_f.quant*l_f.preu) as 'maximum', sum(l_f.quant*l_f.preu) as 'minimum'
+from factura f, linia_fac l_f
+where f.num_f=l_f.num_f
+group by f.num_f)   as table1;
+
+select *
+from article
+where preu > (SELECT avg (preu)
+              from article)
+              order by cod_cat, cod_a;
+   
+   
+   select cod_cat,MAX(preu) 
+   from article
+   where cod_cat is not null 
+   GROUP by cod_cat;
+   
+   
+  -- город в котором есть клиенті но нету продавца 
+  
+  select*
+  from poble p 
+  where p.cod_pob in (select DISTINCT p.cod_pob
+                     from client c INNER JOIN poble p on c.cod_pob=p.cod_pob)
+                      
+  and p.cod_pob not in (select DISTINCT p.cod_pob
+                     from venedor v INNER JOIN poble p on v.cod_pob=p.cod_pob)
+                     order by 2
+                     
+                     
+     -- towns where more selers then buyers ???
+     select  p.cod_pob, p.nom, COUNT(*) as 'Number_of_clients'
+     from poble p, client c, 
+     where p.cod_pob=c.cod_pob 
+     group by p.cod_pob
+     
+      select  v.cod_pob, v.nom, COUNT(*) as 'Number of seller'
+     from poble p, venedor v 
+     where v.cod_pob=p.cod_pob 
+     group by v.cod_pob
+     
+  SELECT p.cod_pob,count(c.cod_pob) as 'Number of clients', count(v.cod_pob) as 'number of venedor'
+  from poble p, venedor v, client c
+  where v.cod_pob=p.cod_pob and c.cod_pob=p.cod_pob
+  group by v.cod_pob
+  -- from gpt 
+  SELECT p.cod_pob,
+       COUNT(c.cod_pob) AS 'Number of clients',
+       COUNT(v.cod_pob) AS 'Number of sellers'
+FROM poble p
+LEFT JOIN client c ON c.cod_pob = p.cod_pob
+LEFT JOIN venedor v ON v.cod_pob = p.cod_pob
+GROUP BY p.cod_pob
+HAVING COUNT(v.cod_pob) > COUNT(c.cod_pob);
+
+  
+  -- most expancive invoice maximum amount in each semester 
+  select table1.trimester, max(table1.total)
+  from 
+  (SELECT f.num_f,quarter(f.data) as 'Trimester' , sum(l_f.quant*l_f.preu) as 'total'
+  from factura f, linia_fac l_f
+  where l_f.num_f=f.num_f
+  group by f.num_f, quarter(f.data)) as table1
+  group by 1
+  
+  -- get towns where more vendors than clients. not done 
+  
+  select  p.cod_pob, p.nom, count(*) as 'total vendors'
+  from venedor v, poble p 
+  WHERE v.cod_pob=p.cod_pob
+  group by 1;
+  where EXISTS
+  (select c.cod_pob, count(*) as 'total clients'
+  from client c , poble p 
+  WHERE c.cod_pob=p.cod_pob);
+  
+  -- get vendor name ,total number of factura, total percentages he did
+  
+  select table1.nom, table1.total_venedor,table1.total_venedor*100/(select count(num_f)
+  from  factura)
+  from 
+  (select v.cod_ven, v.nom,count(*) as 'total_venedor'
+  from venedor v , factura f 
+  where v.cod_ven=f.cod_ven
+  group by v.cod_ven) as table1
+ 
+ -- get all info about most expancive invoice
+ 
+ select f.num_f,f.data,sum(l_f.quant*l_f.preu)
+ from factura f , linia_fac l_f
+ where f.num_f=l_f.num_f
+ group by f.num_f
+ order by 3 DESC
+ limit 1;
+ 
+ -- выбрать всех продавцов и покупателей и обозначить их кто есть кто 
+ 
+ SELECT distinct v.nom,case when v.cod_ven >1 then 'Venedor' end as 'venedor o client'
+from factura f,venedor v
+where f.cod_ven=v.cod_ven
+and year(
+f.data
+)=2015 and quarter(
+f.data
+)=1
+UNION
+SELECT distinct c.nom,case when c.cod_cli >1 then 'Client' end as 'venedor o client'
+from factura f,client c
+where f.cod_cli=c.cod_cli
+and year(
+f.data
+)=2015 and quarter(
+f.data
+)=1
+order by 1 
+
+
+-- города в котором есть и продавац и клиент 
+
+select DISTINCT p.nom
+from venedor v, poble p 
+where v.cod_pob=p.cod_pob
+INTERSECT
+select DISTINCT p.nom
+from client c, poble p 
+where c.cod_pob=p.cod_pob
+order by 1
+
+
+
+ 
+  
+  
+  
+  
+  
+  
+  
